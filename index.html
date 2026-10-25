@@ -70,7 +70,7 @@ body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-
 .btn-primary:hover { filter: brightness(1.1); background: var(--accent); }
 
 .main-layout { max-width: 1380px; margin: 20px auto; padding: 0 16px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; }
-@media (max-width: 1080px) { .main-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1260px) { .main-layout { grid-template-columns: minmax(0, 1fr); } }
 .panel { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.03); min-width: 0; }
 @media (max-width: 600px) { .panel { padding: 14px; } }
 
@@ -143,6 +143,12 @@ td.dead { background: repeating-linear-gradient(45deg, var(--paper), var(--paper
 .cell-box { width: 46px; height: 46px; margin: 0 auto; border-radius: 6px; border: 1px dashed var(--rule); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: var(--card); color: var(--ink); user-select: none; transition: background .15s, border-color .15s; position: relative; padding: 0; font: inherit; }
 .cell-box:hover { border-color: var(--accent); background: var(--accent-soft); }
 .cell-box.selected { outline: 3px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+table.scorecard-tbl td.hl, table.scorecard-tbl th.hl { background: var(--accent-soft); }
+table.scorecard-tbl td.name-col.hl { background: var(--accent-soft); }
+.cell-box.guess { border: 2px dotted var(--gold); }
+.cell-box.guess .val-text { font-style: italic; }
+.cell-box .pencil { position: absolute; bottom: 0; left: 3px; font-size: .68rem; line-height: 1; color: var(--gold); }
+.palette-btn.on { outline: 2px solid var(--gold); }
 .cell-box .val-text { font-size: 0.86rem; font-weight: 700; font-family: var(--mono); }
 .cell-box .fate { position: absolute; top: 1px; right: 3px; font-size: .72rem; font-weight: 700; line-height: 1; }
 .cell-box .fate.R { color: var(--gold); }
@@ -292,10 +298,11 @@ dialog .bar { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14
           <button class="palette-btn fate-btn" data-f="R" onclick="applyFate('R')"><span style="color:var(--gold)">★</span> <small>scored</small></button>
           <button class="palette-btn fate-btn" data-f="X" onclick="applyFate('X')"><span style="color:var(--bad)">✕</span> <small>out on bases</small></button>
           <button class="palette-btn fate-btn" data-f="L" onclick="applyFate('L')"><span style="color:var(--accent)">◆</span> <small>left on base</small></button>
+          <button class="palette-btn" id="guess-btn" onclick="toggleGuess()" title="Mark this square as a guess (G)">✎ <small>guess</small></button>
           <button class="palette-btn" onclick="applyKeypad('')">⌫ <small>clear</small></button>
         </div>
       </div>
-      <p class="legend">Each inning must balance: <strong>batters = outs + runs + left on base</strong>. Outs count runners put out on the bases (✕), not only outs at the plate. An inning can end with a man still at bat; leave his square for the next inning.</p>
+      <p class="legend">Each inning must balance: <strong>batters = outs + runs + left on base</strong>. Outs count runners put out on the bases (✕), not only outs at the plate. An inning can end with a man still at bat; leave his square for the next inning. Tap a square to light its row and column. ✎ marks a square as a guess so you know what to revisit.</p>
     </div>
   </section>
 
@@ -540,7 +547,7 @@ function inningStatus(t, inn) {
   const problems = [];
   if (i.n === 0) return { ...i, state: "empty", problems, exp };
   if (!i.contiguous) problems.push("the batters skip a place in the order");
-  else if (exp !== null && i.lead !== exp) problems.push(`the inning should lead off with ${GAME[t].slots[exp].name}, the man after the last batter of the ${ORD[inn - 1]}`);
+  else if (exp !== null && i.lead !== exp) problems.push(`the inning should lead off with ${GAME[t].slots[exp].name}, ${inn === 0 ? "who bats first in the game" : "the man after the last batter of the " + ORD[inn - 1]}`);
   if (i.outs > 3) problems.push(`${i.outs} outs marked, one inning has 3`);
   if (i.runs > i.line) problems.push(`${i.runs} runs marked, the line score gives ${i.line}`);
   const complete = i.missingFate.length === 0 && i.outs === 3;
@@ -731,23 +738,26 @@ function renderScorecard() {
   document.getElementById("btn-team-bro").className = `btn ${t === "BRO" ? "btn-primary" : ""}`;
   const tbl = document.getElementById("full-scorecard");
   const st = Array.from({ length: 9 }, (_, i) => i < N ? inningStatus(t, i) : null);
-  let h = `<thead><tr><th>Batting order</th>${ORD.map((o, i) => `<th>${i + 1}</th>`).join("")}<th>AB</th><th>R</th><th>H</th></tr></thead><tbody>`;
+  const selInn = selectedCell ? selectedCell.inn : -1, selSlot = selectedCell ? selectedCell.slot : -1;
+  let h = `<thead><tr><th>Batting order</th>${ORD.map((o, i) => `<th class="${i === selInn ? "hl" : ""}">${i + 1}</th>`).join("")}<th>AB</th><th>R</th><th>H</th></tr></thead><tbody>`;
   team.slots.forEach((p, s) => {
     const ri = rowInfo(t, s);
-    h += `<tr><td class="name-col">${slotLabel(t, s)}<small>${s + 1} · ${p.pos} · box ${p.ab} AB, ${p.r} R, ${p.h} H</small></td>`;
+    const rowHl = s === selSlot ? "hl" : "";
+    h += `<tr><td class="name-col ${rowHl}">${slotLabel(t, s)}<small>${s + 1} · ${p.pos} · box ${p.ab} AB, ${p.r} R, ${p.h} H</small></td>`;
     for (let inn = 0; inn < 9; inn++) {
       if (inn >= N) { h += `<td class="dead">x</td>`; continue; }
       const c = S.board[t][s][inn];
+      const hl = (s === selSlot || inn === selInn) ? "hl" : "";
       const sel = selectedCell && selectedCell.slot === s && selectedCell.inn === inn;
       const fateMark = c.f === "R" ? "★" : c.f === "X" ? "✕" : c.f === "L" ? "◆" : (REACH_RES.has(c.r) ? "?" : "");
       const fateCls = c.f || (REACH_RES.has(c.r) ? "Q" : "");
-      h += `<td><button type="button" class="cell-box ${c.r ? "val-" + c.r : ""} ${sel ? "selected" : ""}" data-slot="${s}" data-inn="${inn}" aria-label="${p.name}, ${ORD[inn]} inning: ${c.r || "empty"}" onclick="selectCell(${s}, ${inn})">${fateMark ? `<span class="fate ${fateCls}">${fateMark}</span>` : ""}<span class="val-text">${c.r}</span></button></td>`;
+      h += `<td class="${hl}"><button type="button" class="cell-box ${c.r ? "val-" + c.r : ""} ${sel ? "selected" : ""} ${c.g && c.r ? "guess" : ""}" data-slot="${s}" data-inn="${inn}" aria-label="${p.name}, ${ORD[inn]} inning: ${c.r || "empty"}" onclick="selectCell(${s}, ${inn})">${fateMark ? `<span class="fate ${fateCls}">${fateMark}</span>` : ""}${c.g && c.r ? `<span class="pencil" aria-label="guess">✎</span>` : ""}<span class="val-text">${c.r}</span></button></td>`;
     }
     const any = S.board[t][s].some(c => c.r);
     const b = (have, want) => `<span class="counter-badge ${have > want ? "bad" : have === want && any ? "ok" : "wait"}">${have}/${want}</span>`;
-    h += `<td>${b(ri.ab, p.ab)}</td><td>${b(ri.r, p.r)}</td><td>${b(ri.h, p.h)}</td></tr>`;
+    h += `<td class="${rowHl}">${b(ri.ab, p.ab)}</td><td class="${rowHl}">${b(ri.r, p.r)}</td><td class="${rowHl}">${b(ri.h, p.h)}</td></tr>`;
   });
-  const foot = (label, fn) => `<tr class="foot"><td class="name-col">${label}</td>${st.map((x, i) => x ? `<td>${fn(x, i)}</td>` : `<td class="dead"></td>`).join("")}<td colspan="3"></td></tr>`;
+  const foot = (label, fn) => `<tr class="foot"><td class="name-col">${label}</td>${st.map((x, i) => x ? `<td class="${i === selInn ? "hl" : ""}">${fn(x, i)}</td>` : `<td class="dead"></td>`).join("")}<td colspan="3"></td></tr>`;
   h += foot("Runs (line score)", x => `<span class="counter-badge ${x.runs === x.line ? (x.complete ? "ok" : "wait") : x.runs > x.line || x.complete ? "bad" : "wait"}">${x.runs}/${x.line}</span>`);
   h += foot("Outs", x => `<span class="counter-badge ${x.outs === 3 ? "ok" : x.outs > 3 ? "bad" : "wait"}">${x.outs}/3</span>`);
   h += foot("Left on base", x => `<span class="counter-badge ${x.state === "ok" ? "ok" : "wait"}">${x.lob}</span>`);
@@ -762,6 +772,7 @@ function renderKeypadState() {
   const c = selectedCell ? S.board[S.team][selectedCell.slot][selectedCell.inn] : null;
   document.querySelectorAll("#keypad .palette-btn").forEach(b => b.disabled = !selectedCell);
   document.querySelectorAll("#keypad .fate-btn").forEach(b => b.disabled = !c || !REACH_RES.has(c.r));
+  const gb = document.getElementById("guess-btn"); gb.disabled = !c || !c.r; gb.classList.toggle("on", !!(c && c.r && c.g));
 }
 function renderNextStep(st) {
   const el = document.getElementById("next-step"), t = S.team, g = GAME[t];
@@ -805,7 +816,7 @@ function setCellValue(t, slot, inn, res) {
   const c = S.board[t][slot][inn];
   const prevRes = c.r;
   c.r = res;
-  if (!res) c.f = "";
+  if (!res) { c.f = ""; c.g = false; }
   else if (OUT_RES.has(res)) c.f = "X";
   else if (res === "HR") c.f = "R";
   else if (!REACH_RES.has(prevRes)) c.f = ""; // coming from an out or homer: the trip is open again
@@ -839,6 +850,12 @@ function applyFate(f) {
   renderAdult();
 }
 function toggleScoredKeypad() { applyFate("R"); }
+function toggleGuess() {
+  if (!selectedCell) { flash = "Tap a square first."; renderAdult(); return; }
+  const c = S.board[S.team][selectedCell.slot][selectedCell.inn];
+  if (!c.r) { flash = "Mark what he did first, then flag it as a guess."; renderAdult(); return; }
+  remember(); c.g = !c.g; save(); renderAdult();
+}
 // Programmatic fill used by tests and by the keyboard: same rules as the keypad.
 function setCell(t, slot, inn, res, fate) {
   remember();
@@ -972,6 +989,7 @@ document.addEventListener("keydown", e => {
   if (mv) { e.preventDefault(); selectedCell = { slot: (selectedCell.slot + mv[0] + 9) % 9, inn: Math.min(innings(S.team) - 1, Math.max(0, selectedCell.inn + mv[1])) }; renderAdult(); return; }
   if (map[k]) { e.preventDefault(); applyKeypad(map[k]); }
   else if (fates[k]) { e.preventDefault(); applyFate(fates[k]); }
+  else if (k === "g" || e.key === "?") { e.preventDefault(); toggleGuess(); }
   else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); applyKeypad(""); }
 });
 
