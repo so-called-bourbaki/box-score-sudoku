@@ -125,7 +125,7 @@ body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-
 .reveal.show { display: block; }
 .reveal h4 { margin: 0 0 6px; font-family: var(--head); font-size: 1.02rem; }
 .reveal ol { margin: 0; padding-left: 20px; }
-.reveal .src { font-size: .75rem; color: var(--muted); margin-top: 6px; }
+.src { font-size: .75rem; color: var(--muted); margin-top: 6px; }
 
 /* Adult Mode */
 .adult-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -216,6 +216,8 @@ dialog .bar { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14
     </div>
     <div class="top-actions">
       <button class="btn" onclick="openScanModal()">🗞️ Newspaper</button>
+      <button class="btn btn-primary" id="share-result" type="button" title="Copy a spoiler-free emoji grid of your progress">📋 Share</button>
+      <span id="share-toast" role="status" aria-live="polite"></span>
       <button class="btn" id="undo-btn" onclick="undo()" title="Undo (Ctrl+Z)">↶ Undo</button>
       <button class="btn" id="reset-btn" onclick="openReset()">↺ Reset</button>
     </div>
@@ -229,10 +231,6 @@ dialog .bar { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14
     <div class="status-card" id="status-card" role="status" aria-live="polite">
       <h3 id="status-title"></h3>
       <p id="status-text"></p>
-      <div class="share-row">
-        <button class="btn btn-primary" id="share-result" type="button" hidden>📋 Share result</button>
-        <span id="share-toast" role="status" aria-live="polite"></span>
-      </div>
       <div class="challenge" id="tp-challenge" hidden>
         <strong>Last challenge: the cells the box leaves open.</strong>
         The box says <em>“Triple play—Wambsganss (unassisted)”</em> but not when, or who hit into it.
@@ -324,6 +322,8 @@ dialog .bar { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14
         • <strong>Hits:</strong> off Grimes 9 in 3⅓ innings; off Mitchell 3 in 4⅔.<br>
         • <strong>Struck out:</strong> by Bagby 3; by Mitchell 1. <strong>Wild pitch:</strong> Bagby. <strong>Passed ball:</strong> Miller.
       </div>
+      <div class="src" style="margin-top:10px;">Scan: Evening Star (Washington, D.C.), Oct. 11, 1920, p. 21, Library of Congress. Public domain. Want the answer? <a href="https://www.retrosheet.org/boxesetc/1920/B10100CLE1920.htm" target="_blank" rel="noopener">Retrosheet has the play-by-play</a>.</div>
+      <div class="src" style="margin-top:6px;">This is puzzle #1 and it will change with what players tell us. Feedback: <a href="https://socalledbourbaki.substack.com" target="_blank" rel="noopener">socalledbourbaki.substack.com</a> or the itch.io comments.</div>
     </div>
     <div class="newspaper-card" id="checks-card">
       <h3 id="checks-title">What the box checks</h3>
@@ -866,8 +866,7 @@ function renderStatus() {
   const kidsDone = KID_ORDER.filter(kidDone);
   ["CLE", "BRO"].forEach(t => { if (proves[t] && !S.proved[t]) { S.proved[t] = true; celebrated = t; save(); } });
   const anyProof = proves.CLE || proves.BRO;
-  const showShare = anyProof || kidsDone.length > 0;
-  shareBtn.hidden = !showShare;
+  shareBtn.hidden = false;
   const tp = document.getElementById("tp-challenge");
   tp.hidden = !(S.mode === "adult" && anyProof);
   if (S.mode === "adult" && anyProof) {
@@ -902,7 +901,7 @@ function shareResult() {
   const done = ok => {
     toast.textContent = ok ? "Copied to clipboard!" : "Copy failed; select and copy the card below.";
     toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2200);
-    if (!ok) { const old = document.querySelector(".share-fallback"); if (old) old.remove(); const pre = document.createElement("pre"); pre.className = "share-fallback"; pre.textContent = text; toast.after(pre); }
+    if (!ok) { const old = document.querySelector(".share-fallback"); if (old) old.remove(); const pre = document.createElement("pre"); pre.className = "share-fallback"; pre.textContent = text; document.getElementById("status-card").before(pre); }
   };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); else done(false);
 }
